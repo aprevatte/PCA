@@ -1,0 +1,126 @@
+---
+title: "PC662 PCA Plot QE"
+author: "Alex Prevatte"
+date: "4/14/2020"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Libraries
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+library("ggplot2")
+library("grid")
+library("gridExtra")
+library("readr")
+library("ggplot2")
+#++++++++++++++++++++++++++++++++++++++
+# Principal Component Analysis (PCA)
+#++++++++++++++++++++++++++++++++++++++
+
+#read in text file
+PC662data_QE <- read_tsv("/Users/awprevatte/PC662 QE raw values.txt")
+#compute column sums
+totalInt <- colSums(PC662data_QE)
+#compute colume means
+meanInt <- mean(totalInt)
+
+#Determined corrected ratios below
+ratioO_24_R1 <- sum(PC662data_QE$`0_24h_rep1`)/meanInt
+ratioO_24_R2 <- sum(PC662data_QE$`0_24h_rep2`)/meanInt
+ratioO_24_R3 <- sum(PC662data_QE$`0_24h_rep3`)/meanInt
+ratio250_16_R1 <- sum(PC662data_QE$`250_16h_rep1`)/meanInt
+ratio250_16_R2 <- sum(PC662data_QE$`250_16h_rep2`)/meanInt
+ratio250_16_R3 <- sum(PC662data_QE$`250_16h_rep3`)/meanInt
+ratio250_24_R1 <- sum(PC662data_QE$`250_24h_rep1`)/meanInt
+ratio250_24_R2 <- sum(PC662data_QE$`250_24h_rep2`)/meanInt
+ratio250_24_R3 <- sum(PC662data_QE$`250_24h_rep3`)/meanInt
+
+#Applied correction to normalize all reporter ion intensities
+corRatioO_24_R1 <-PC662data_QE$`0_24h_rep1`/ ratioO_24_R1
+corRatioO_24_R2 <-PC662data_QE$`0_24h_rep2`/ ratioO_24_R2
+corRatioO_24_R3 <-PC662data_QE$`0_24h_rep3`/ ratioO_24_R3
+corRatio250_16_R1 <-PC662data_QE$`250_16h_rep1`/ ratio250_16_R1
+corRatio250_16_R2 <-PC662data_QE$`250_16h_rep2`/ ratio250_16_R2
+corRatio250_16_R3 <-PC662data_QE$`250_16h_rep3`/ ratio250_16_R3
+corRatio250_24_R1 <-PC662data_QE$`250_24h_rep1`/ ratio250_24_R1
+corRatio250_24_R2 <-PC662data_QE$`250_24h_rep2`/ ratio250_24_R2
+corRatio250_24_R3 <-PC662data_QE$`250_24h_rep3`/ ratio250_24_R3
+
+#log(2) transformed values
+R1_0h_24h <- log(corRatioO_24_R1)/log(2)
+R2_0h_24h <- log(corRatioO_24_R2)/log(2)
+R3_0h_24h <- log(corRatioO_24_R3)/log(2)
+R1_250_16h <- log(corRatio250_16_R1)/log(2)
+R2_250_16h <- log(corRatio250_16_R2)/log(2)
+R3_250_16h <- log(corRatio250_16_R3)/log(2)
+R1_250_24h <- log(corRatio250_24_R1)/log(2)
+R2_250_24h <- log(corRatio250_24_R2)/log(2)
+R3_250_24h <- log(corRatio250_24_R3)/log(2)
+
+#Final log transformed matrix combining all columns
+PC662_QE_matrix <- cbind(R1_0h_24h,R2_0h_24h,R3_0h_24h,R1_250_16h,R2_250_16h,R3_250_16h,R1_250_24h,R2_250_24h,R3_250_24h)
+
+#PCA plot using prcomp
+
+#transpose the matrix
+data.t <- as.data.frame(t(PC662_QE_matrix))
+#PCA computation
+pca <- prcomp(data.t)
+#basic PCA plot
+plot(pca$x[,1], pca$x[,2])
+
+#Eigenvalues and variance 
+eigen <- pca$sdev^2
+variance <- (eigen/sum(eigen)) * 100
+variance <- format(round(variance, 2), nsmall=2) # show 2 digits after decimal
+
+#Convert to dataframe for ggplot
+data_out <- as.data.frame(pca$x)
+
+#Add a column to the matrix composed of the rows
+#Parse out this 'Condition' column so that each label will be grouped accordingly 
+#data_out$Condition <- sapply( strsplit(as.character(row.names(data.t)), "_"), "[[", 2 )
+
+data_out$Condition <- c('0h_24h','0h_24h','0h_24h','250_16h','250_16h','250_16h','250_24h','250_24h','250_24h')
+
+#check beginning of matrix
+head(data_out)
+
+#PCA plot with color groupings
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition))
+p<-p+geom_point()
+p
+
+#theme for a white background with no gridlines
+theme<-theme(panel.background = element_blank(),panel.border=element_rect(fill=NA),panel.grid.major = element_blank(),panel.grid.minor = element_blank(),strip.background=element_blank(),axis.text.x=element_text(colour="black"),axis.text.y=element_text(colour="black"),axis.ticks=element_line(colour="black"),plot.margin=unit(c(1,1,1,1),"line"),legend.key = element_rect(fill = "white", color = NA))
+
+#Addition of theme to the ggplot
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition ))
+p<-p+geom_point()+theme
+p
+
+#Compute parameters for the ggplot
+y.range <- max(data_out$PC2) - min(data_out$PC2)
+min.x <- min(data_out$PC1)
+max.x <- max(data_out$PC1)
+x.range <- max.x - min.x
+
+#Final PCA plot 
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition, label=row.names(data.t)))
+p<-p+geom_point(size = 3) + 
+  geom_text(size=4,show.legend=FALSE, nudge_y = y.range/20)+ scale_x_continuous(limits=c(min.x - x.range/10, max.x + x.range/10)) +
+  xlab(paste("PC1 (", variance[1], "% explained variance)", sep="")) +
+  ylab(paste("PC2 (", variance[2], "% explained variance)", sep="")) +
+  ggtitle(paste("Principal Component Analysis (PCA) -", "PC662 QE", "protein")) + 
+  theme
+p
+    pdf("PC662 PCA Plot QE Final.pdf", width=9, height=6.5)
+    print(p)
+    dev.off()
+
+```
+```
+
