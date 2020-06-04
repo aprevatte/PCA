@@ -1,0 +1,86 @@
+---
+title: "PC685 PCA Plot"
+author: "Alex Prevatte"
+date: "4/27/2020"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Libraries
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+library("ggplot2")
+library("grid")
+library("gridExtra")
+library("readr")
+#++++++++++++++++++++++++++++++++++++++
+# Principal Component Analysis (PCA)
+#++++++++++++++++++++++++++++++++++++++
+
+#read in text file
+PC685 <- read_tsv("/Users/awprevatte/PC685 normalized intensities.txt")
+#remove nans
+PC685 <- na.omit(PC685)
+
+#PCA plot using prcomp
+#transpose the matrix
+data.t <- as.data.frame(t(PC685))
+#PCA computation
+pca <- prcomp(data.t)
+#basic PCA plot
+plot(pca$x[,1], pca$x[,2])
+
+#Eigenvalues and variance 
+eigen <- pca$sdev^2
+variance <- (eigen/sum(eigen)) * 100
+variance <- format(round(variance, 2), nsmall=2) # show 2 digits after decimal
+
+#Convert to dataframe for ggplot
+data_out <- as.data.frame(pca$x)
+
+#Add a column to the matrix composed of the rows
+#Parse out this 'Condition' column so that each label will be grouped accordingly 
+#data_out$Condition <- sapply( strsplit(as.character(row.names(data.t)), "_"), "[[", 2 )
+
+data_out$Condition <- c('DMSO','DMSO','DMSO','AKTi','AKTi','AKTi','PI3K','PI3K','PI3K')
+
+#check beginning of matrix
+head(data_out)
+
+#PCA plot with color groupings
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition))
+p<-p+geom_point()
+p
+
+#theme for a white background with no gridlines
+theme<-theme(panel.background = element_blank(),panel.border=element_rect(fill=NA),panel.grid.major = element_blank(),panel.grid.minor = element_blank(),strip.background=element_blank(),axis.text.x=element_text(colour="black"),axis.text.y=element_text(colour="black"),axis.ticks=element_line(colour="black"),plot.margin=unit(c(1,1,1,1),"line"),legend.key = element_rect(fill = "white", color = NA))
+
+#Addition of theme to the ggplot
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition ))
+p<-p+geom_point()+theme
+p
+
+#Compute parameters for the ggplot
+y.range <- max(data_out$PC2) - min(data_out$PC2)
+min.x <- min(data_out$PC1)
+max.x <- max(data_out$PC1)
+x.range <- max.x - min.x
+
+#Final PCA plot 
+p<-ggplot(data_out,aes(x=PC1,y=PC2,color=Condition, label=row.names(data.t)))
+p<-p+geom_point(size = 3) + 
+  geom_text(size=4,show.legend=FALSE, nudge_y = y.range/20)+ scale_x_continuous(limits=c(min.x - x.range/10, max.x + x.range/10)) +
+  xlab(paste("PC1 (", variance[1], "% explained variance)", sep="")) +
+  ylab(paste("PC2 (", variance[2], "% explained variance)", sep="")) +
+  ggtitle(paste("Principal Component Analysis (PCA) -", "PC685 Lumos", "protein")) + 
+  theme
+p
+    pdf("PC685 PCA Plot Lumos Final.pdf", width=9, height=6.5)
+    print(p)
+    dev.off()
+```
+
